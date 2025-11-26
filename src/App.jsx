@@ -25,7 +25,24 @@ function App() {
         }
     }
 
-    const [targetUrl, setTargetUrl] = useState(() => loadFromStorage(STORAGE_KEYS.targetUrl, ''))
+    // Get initial targetUrl from query string or localStorage
+    const getInitialTargetUrl = () => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search)
+            const urlFromQuery = urlParams.get('url') || urlParams.get('targetUrl')
+            if (urlFromQuery) {
+                try {
+                    // Decode the URL in case it's encoded
+                    return decodeURIComponent(urlFromQuery)
+                } catch {
+                    return urlFromQuery
+                }
+            }
+        }
+        return loadFromStorage(STORAGE_KEYS.targetUrl, '')
+    }
+
+    const [targetUrl, setTargetUrl] = useState(() => getInitialTargetUrl())
     const [selectedFiles, setSelectedFiles] = useState([])
     const [authMethod, setAuthMethod] = useState(() => loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER'))
     const [authValue, setAuthValue] = useState(() => loadFromStorage(STORAGE_KEYS.authValue, ''))
@@ -504,16 +521,7 @@ function App() {
                 )}
 
                 <div className="form-section">
-                    <label>
-                        Custom Headers
-                        <button
-                            type="button"
-                            onClick={addCustomHeader}
-                            className="btn btn-secondary btn-small"
-                        >
-                            + Add Header
-                        </button>
-                    </label>
+                    <label>Custom Headers</label>
                     {customHeaders.map((header, index) => (
                         <div key={index} className="header-row">
                             <input
@@ -541,6 +549,14 @@ function App() {
                             )}
                         </div>
                     ))}
+                    <button
+                        type="button"
+                        onClick={addCustomHeader}
+                        className="btn btn-secondary btn-small"
+                        style={{ marginTop: '10px' }}
+                    >
+                        + Add Header
+                    </button>
                 </div>
 
                 <div className="form-section">
