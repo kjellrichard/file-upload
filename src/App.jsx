@@ -43,7 +43,9 @@ function App() {
     const [error, setError] = useState(null)
     const [headersExpanded, setHeadersExpanded] = useState(true)
     const [bodyExpanded, setBodyExpanded] = useState(true)
-    const [collapsedPaths, setCollapsedPaths] = useState(new Set())
+    const [showSampleTester, setShowSampleTester] = useState(false)
+    const [sampleJsonInput, setSampleJsonInput] = useState('')
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '')
 
     // Save to localStorage whenever values change
     useEffect(() => {
@@ -182,140 +184,93 @@ function App() {
         setCustomHeaders(updated)
     }
 
-    const toggleCollapse = (path) => {
-        setCollapsedPaths(prev => {
-            const newSet = new Set(prev)
-            if (newSet.has(path)) {
-                newSet.delete(path)
-            } else {
-                newSet.add(path)
-            }
-            return newSet
-        })
-    }
+    const colorizeJson = (jsonString) => {
+        const parts = []
+        let index = 0
+        let key = 0
 
-    const isCollapsed = (path) => {
-        return collapsedPaths.has(path)
-    }
+        while (index < jsonString.length) {
+            const char = jsonString[index]
 
-    const renderJsonValue = (value, path = '', depth = 0) => {
-        const indent = '  '.repeat(depth)
-        const currentPath = path
-
-        if (value === null) {
-            return <span className="json-null">null</span>
-        }
-
-        if (value === undefined) {
-            return <span className="json-undefined">undefined</span>
-        }
-
-        if (typeof value === 'boolean') {
-            return <span className="json-boolean">{String(value)}</span>
-        }
-
-        if (typeof value === 'number') {
-            return <span className="json-number">{value}</span>
-        }
-
-        if (typeof value === 'string') {
-            return <span className="json-string">"{value}"</span>
-        }
-
-        if (Array.isArray(value)) {
-            if (value.length === 0) {
-                return <span className="json-bracket">[]</span>
+            // Match keys (quoted string followed by colon)
+            const keyMatch = jsonString.substring(index).match(/^"(?:[^"\\]|\\.)*":\s*/)
+            if (keyMatch) {
+                parts.push(
+                    <span key={`key-${key++}`} className="json-key">{keyMatch[0].trimEnd()}</span>
+                )
+                if (keyMatch[0].length !== keyMatch[0].trimEnd().length) {
+                    parts.push(' ')
+                }
+                index += keyMatch[0].length
+                continue
             }
 
-            const collapsed = isCollapsed(currentPath)
-            return (
-                <div className="json-container">
-                    <div className="json-line">
-                        <span className="json-indent">{indent}</span>
-                        <span
-                            className="json-toggle"
-                            onClick={() => toggleCollapse(currentPath)}
-                            title={collapsed ? 'Expand' : 'Collapse'}
-                        >
-                            {collapsed ? '▶' : '▼'}
-                        </span>
-                        <span className="json-bracket">[</span>
-                        {collapsed && <span className="json-ellipsis">... {value.length} item{value.length !== 1 ? 's' : ''}</span>}
-                    </div>
-                    {!collapsed && (
-                        <div className="json-content">
-                            {value.map((item, index) => (
-                                <div key={index} className="json-item">
-                                    <span className="json-indent">{indent}  </span>
-                                    {renderJsonValue(item, `${currentPath}[${index}]`, depth + 1)}
-                                    {index < value.length - 1 && <span className="json-comma">,</span>}
-                                </div>
-                            ))}
-                            <div className="json-line">
-                                <span className="json-indent">{indent}</span>
-                                <span className="json-bracket">]</span>
-                            </div>
-                        </div>
-                    )}
-                    {collapsed && (
-                        <div className="json-line">
-                            <span className="json-indent">{indent}</span>
-                            <span className="json-bracket">]</span>
-                        </div>
-                    )}
-                </div>
-            )
-        }
-
-        if (typeof value === 'object') {
-            const keys = Object.keys(value)
-            if (keys.length === 0) {
-                return <span className="json-bracket">{'{}'}</span>
+            // Match string values (quoted string not followed by colon)
+            const stringMatch = jsonString.substring(index).match(/^"(?:[^"\\]|\\.)*"/)
+            if (stringMatch) {
+                parts.push(
+                    <span key={`str-${key++}`} className="json-string">{stringMatch[0]}</span>
+                )
+                index += stringMatch[0].length
+                continue
             }
 
-            const collapsed = isCollapsed(currentPath)
-            return (
-                <div className="json-container">
-                    <div className="json-line">
-                        <span className="json-indent">{indent}</span>
-                        <span
-                            className="json-toggle"
-                            onClick={() => toggleCollapse(currentPath)}
-                            title={collapsed ? 'Expand' : 'Collapse'}
-                        >
-                            {collapsed ? '▶' : '▼'}
-                        </span>
-                        <span className="json-bracket">{'{'}</span>
-                        {collapsed && <span className="json-ellipsis">... {keys.length} key{keys.length !== 1 ? 's' : ''}</span>}
-                    </div>
-                    {!collapsed && (
-                        <div className="json-content">
-                            {keys.map((key, index) => (
-                                <div key={key} className="json-item">
-                                    <span className="json-indent">{indent}  </span>
-                                    <span className="json-key">"{key}"</span>
-                                    <span className="json-colon">: </span>
-                                    {renderJsonValue(value[key], `${currentPath}.${key}`, depth + 1)}
-                                    {index < keys.length - 1 && <span className="json-comma">,</span>}
-                                </div>
-                            ))}
-                            <div className="json-line">
-                                <span className="json-indent">{indent}</span>
-                                <span className="json-bracket">{'}'}</span>
-                            </div>
-                        </div>
-                    )}
-                    {collapsed && (
-                        <div className="json-line">
-                            <span className="json-indent">{indent}</span>
-                            <span className="json-bracket">{'}'}</span>
-                        </div>
-                    )}
-                </div>
-            )
+            // Match numbers
+            const numberMatch = jsonString.substring(index).match(/^-?\d+\.?\d*/)
+            if (numberMatch) {
+                parts.push(
+                    <span key={`num-${key++}`} className="json-number">{numberMatch[0]}</span>
+                )
+                index += numberMatch[0].length
+                continue
+            }
+
+            // Match booleans
+            if (jsonString.substring(index).startsWith('true')) {
+                parts.push(<span key={`bool-${key++}`} className="json-boolean">true</span>)
+                index += 4
+                continue
+            }
+            if (jsonString.substring(index).startsWith('false')) {
+                parts.push(<span key={`bool-${key++}`} className="json-boolean">false</span>)
+                index += 5
+                continue
+            }
+
+            // Match null
+            if (jsonString.substring(index).startsWith('null')) {
+                parts.push(<span key={`null-${key++}`} className="json-null">null</span>)
+                index += 4
+                continue
+            }
+
+            // Match brackets
+            if (char === '[' || char === ']' || char === '{' || char === '}') {
+                parts.push(<span key={`bracket-${key++}`} className="json-bracket">{char}</span>)
+                index++
+                continue
+            }
+
+            // Match colon
+            if (char === ':') {
+                parts.push(<span key={`colon-${key++}`} className="json-colon">{char}</span>)
+                index++
+                continue
+            }
+
+            // Match comma
+            if (char === ',') {
+                parts.push(<span key={`comma-${key++}`} className="json-comma">{char}</span>)
+                index++
+                continue
+            }
+
+            // Default: add character as-is
+            parts.push(char)
+            index++
         }
 
-        return <span>{String(value)}</span>
+        return parts
     }
 
     const renderResponseData = (data) => {
@@ -331,10 +286,9 @@ function App() {
             return <pre className="response-content response-text">{String(data)}</pre>
         }
 
+        const jsonString = JSON.stringify(parsedData, null, 2)
         return (
-            <div className="response-content response-json">
-                {renderJsonValue(parsedData)}
-            </div>
+            <pre className="response-content response-json">{colorizeJson(jsonString)}</pre>
         )
     }
 
@@ -352,7 +306,6 @@ function App() {
         setLoading(true)
         setError(null)
         setResponse(null)
-        setCollapsedPaths(new Set())
         setHeadersExpanded(true)
         setBodyExpanded(true)
 
@@ -598,7 +551,183 @@ function App() {
                     >
                         {loading ? 'Uploading...' : 'Upload Files'}
                     </button>
+                    {isLocalhost && (
+                        <button
+                            type="button"
+                            onClick={() => setShowSampleTester(!showSampleTester)}
+                            className="btn btn-secondary"
+                            style={{ marginLeft: '10px' }}
+                        >
+                            {showSampleTester ? 'Hide' : 'Show'} Sample Response Tester
+                        </button>
+                    )}
                 </div>
+
+                {isLocalhost && showSampleTester && (
+                    <div className="sample-tester-section">
+                        <h3>Sample Response Tester</h3>
+                        <p className="sample-tester-description">
+                            Test the JSON renderer with sample data. Paste JSON below or use a predefined sample.
+                        </p>
+
+                        <div className="form-section">
+                            <label>
+                                Sample JSON Response
+                                <textarea
+                                    value={sampleJsonInput}
+                                    onChange={(e) => setSampleJsonInput(e.target.value)}
+                                    placeholder='Paste JSON here, e.g., {"status": "success", "data": {"id": 123, "name": "test"}}'
+                                    className="input-field sample-json-input"
+                                    rows={8}
+                                />
+                            </label>
+                        </div>
+
+                        <div className="form-section">
+                            <label>Quick Samples:</label>
+                            <div className="sample-buttons">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const sample = {
+                                            status: 'success',
+                                            message: 'File uploaded successfully',
+                                            data: {
+                                                id: 12345,
+                                                filename: 'example.jpg',
+                                                size: 1024000,
+                                                uploadedAt: '2024-01-15T10:30:00Z'
+                                            },
+                                            metadata: {
+                                                contentType: 'image/jpeg',
+                                                checksum: 'abc123def456'
+                                            }
+                                        }
+                                        setSampleJsonInput(JSON.stringify(sample, null, 2))
+                                    }}
+                                    className="btn btn-secondary btn-small"
+                                >
+                                    Simple Object
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const sample = {
+                                            users: [
+                                                { id: 1, name: 'Alice', email: 'alice@example.com', roles: ['admin', 'user'] },
+                                                { id: 2, name: 'Bob', email: 'bob@example.com', roles: ['user'] },
+                                                { id: 3, name: 'Charlie', email: 'charlie@example.com', roles: ['guest'] }
+                                            ],
+                                            pagination: {
+                                                page: 1,
+                                                perPage: 10,
+                                                total: 3
+                                            }
+                                        }
+                                        setSampleJsonInput(JSON.stringify(sample, null, 2))
+                                    }}
+                                    className="btn btn-secondary btn-small"
+                                >
+                                    Array with Objects
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const sample = {
+                                            error: {
+                                                code: 400,
+                                                message: 'Validation failed',
+                                                details: [
+                                                    { field: 'email', message: 'Invalid email format' },
+                                                    { field: 'password', message: 'Password must be at least 8 characters' }
+                                                ],
+                                                timestamp: '2024-01-15T10:30:00Z'
+                                            }
+                                        }
+                                        setSampleJsonInput(JSON.stringify(sample, null, 2))
+                                    }}
+                                    className="btn btn-secondary btn-small"
+                                >
+                                    Error Response
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const sample = {
+                                            nested: {
+                                                level1: {
+                                                    level2: {
+                                                        level3: {
+                                                            level4: {
+                                                                deep: 'Very nested data',
+                                                                array: [1, 2, { nested: 'in array' }, [3, 4]]
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            mixed: {
+                                                strings: ['a', 'b', 'c'],
+                                                numbers: [1, 2, 3],
+                                                booleans: [true, false],
+                                                nulls: [null, null]
+                                            }
+                                        }
+                                        setSampleJsonInput(JSON.stringify(sample, null, 2))
+                                    }}
+                                    className="btn btn-secondary btn-small"
+                                >
+                                    Deeply Nested
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!sampleJsonInput.trim()) {
+                                        setError('Please enter or select a sample JSON response')
+                                        return
+                                    }
+                                    try {
+                                        const parsed = JSON.parse(sampleJsonInput)
+                                        setError(null)
+                                        setResponse({
+                                            status: 200,
+                                            statusText: 'OK',
+                                            headers: {
+                                                'content-type': 'application/json',
+                                                'content-length': String(sampleJsonInput.length)
+                                            },
+                                            data: parsed,
+                                            file: 'sample.json'
+                                        })
+                                        setHeadersExpanded(true)
+                                        setBodyExpanded(true)
+                                    } catch (err) {
+                                        setError(`Invalid JSON: ${err.message}`)
+                                    }
+                                }}
+                                className="btn btn-primary"
+                            >
+                                Load Sample Response
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSampleJsonInput('')
+                                    setResponse(null)
+                                    setError(null)
+                                }}
+                                className="btn btn-secondary"
+                                style={{ marginLeft: '10px' }}
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {error && (
                     <div className="error-message">

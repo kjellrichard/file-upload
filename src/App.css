@@ -274,6 +274,20 @@ h2 {
     min-height: 20px;
 }
 
+.json-toggle-column {
+    width: 20px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.json-content-column {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
 .json-toggle {
     cursor: pointer;
     color: #888;
@@ -281,9 +295,7 @@ h2 {
     user-select: none;
     display: inline-block;
     padding: 0 4px;
-    margin-right: 2px;
     transition: color 0.2s;
-    flex-shrink: 0;
 }
 
 .json-toggle:hover {
@@ -338,21 +350,46 @@ h2 {
     margin: 2px 0;
     display: flex;
     align-items: flex-start;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+}
+
+.json-item .json-content-column {
+    align-items: flex-start;
 }
 
 .json-comma {
-    margin-left: 4px;
+    margin-left: 0;
+    display: inline;
 }
 
 .json-indent {
     display: inline-block;
     flex-shrink: 0;
+    white-space: pre;
+}
+
+.json-item-content {
+    display: inline;
+    flex: 1;
 }
 
 .json-content {
     display: block;
     width: 100%;
+}
+
+.json-nested-value {
+    display: block;
+    width: 100%;
+}
+
+.json-inline-array {
+    display: inline;
+}
+
+.json-inline-bracket-container {
+    display: inline-block;
+    vertical-align: top;
 }
 
 /* Status Code Colors */
@@ -403,4 +440,39 @@ h2 {
 .response-headers-content::-webkit-scrollbar-thumb:hover,
 .response-body-content::-webkit-scrollbar-thumb:hover {
     background: #777;
+}
+
+/* Sample Response Tester */
+.sample-tester-section {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.sample-tester-section h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.sample-tester-description {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 20px;
+}
+
+.sample-json-input {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 150px;
+}
+
+.sample-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
 }
