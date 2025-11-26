@@ -42,9 +42,25 @@ function App() {
         return loadFromStorage(STORAGE_KEYS.targetUrl, '')
     }
 
+    // Get initial authMethod from query string or localStorage
+    const getInitialAuthMethod = () => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search)
+            const authMethodFromQuery = urlParams.get('authMethod') || urlParams.get('auth')
+            if (authMethodFromQuery) {
+                const upperAuthMethod = authMethodFromQuery.toUpperCase()
+                // Validate it's one of the allowed values
+                if (['BEARER', 'BASIC', 'BASIC_CREDENTIALS'].includes(upperAuthMethod)) {
+                    return upperAuthMethod
+                }
+            }
+        }
+        return loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER')
+    }
+
     const [targetUrl, setTargetUrl] = useState(() => getInitialTargetUrl())
     const [selectedFiles, setSelectedFiles] = useState([])
-    const [authMethod, setAuthMethod] = useState(() => loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER'))
+    const [authMethod, setAuthMethod] = useState(() => getInitialAuthMethod())
     const [authValue, setAuthValue] = useState(() => loadFromStorage(STORAGE_KEYS.authValue, ''))
     const [username, setUsername] = useState(() => loadFromStorage(STORAGE_KEYS.username, ''))
     const [password, setPassword] = useState(() => loadFromStorage(STORAGE_KEYS.password, ''))
