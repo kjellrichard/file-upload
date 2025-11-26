@@ -232,8 +232,6 @@ function App() {
                 <div className="json-container">
                     <div className="json-line">
                         <span className="json-indent">{indent}</span>
-                        <span className="json-bracket">[</span>
-                        {collapsed && <span className="json-ellipsis">... {value.length} item{value.length !== 1 ? 's' : ''}</span>}
                         <span
                             className="json-toggle"
                             onClick={() => toggleCollapse(currentPath)}
@@ -241,6 +239,8 @@ function App() {
                         >
                             {collapsed ? '▶' : '▼'}
                         </span>
+                        <span className="json-bracket">[</span>
+                        {collapsed && <span className="json-ellipsis">... {value.length} item{value.length !== 1 ? 's' : ''}</span>}
                     </div>
                     {!collapsed && (
                         <div className="json-content">
@@ -259,6 +259,7 @@ function App() {
                     )}
                     {collapsed && (
                         <div className="json-line">
+                            <span className="json-indent">{indent}</span>
                             <span className="json-bracket">]</span>
                         </div>
                     )}
@@ -277,8 +278,6 @@ function App() {
                 <div className="json-container">
                     <div className="json-line">
                         <span className="json-indent">{indent}</span>
-                        <span className="json-bracket">{'{'}</span>
-                        {collapsed && <span className="json-ellipsis">... {keys.length} key{keys.length !== 1 ? 's' : ''}</span>}
                         <span
                             className="json-toggle"
                             onClick={() => toggleCollapse(currentPath)}
@@ -286,6 +285,8 @@ function App() {
                         >
                             {collapsed ? '▶' : '▼'}
                         </span>
+                        <span className="json-bracket">{'{'}</span>
+                        {collapsed && <span className="json-ellipsis">... {keys.length} key{keys.length !== 1 ? 's' : ''}</span>}
                     </div>
                     {!collapsed && (
                         <div className="json-content">
@@ -306,6 +307,7 @@ function App() {
                     )}
                     {collapsed && (
                         <div className="json-line">
+                            <span className="json-indent">{indent}</span>
                             <span className="json-bracket">{'}'}</span>
                         </div>
                     )}
