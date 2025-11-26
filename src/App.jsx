@@ -41,6 +41,9 @@ function App() {
     const [response, setResponse] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
+    const [headersExpanded, setHeadersExpanded] = useState(true)
+    const [bodyExpanded, setBodyExpanded] = useState(true)
+    const [collapsedPaths, setCollapsedPaths] = useState(new Set())
 
     // Save to localStorage whenever values change
     useEffect(() => {
@@ -179,19 +182,138 @@ function App() {
         setCustomHeaders(updated)
     }
 
-    const formatResponse = (data) => {
-        if (typeof data === 'string') {
-            try {
-                const parsed = JSON.parse(data)
-                return JSON.stringify(parsed, null, 2)
-            } catch {
-                return data
+    const toggleCollapse = (path) => {
+        setCollapsedPaths(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(path)) {
+                newSet.delete(path)
+            } else {
+                newSet.add(path)
             }
+            return newSet
+        })
+    }
+
+    const isCollapsed = (path) => {
+        return collapsedPaths.has(path)
+    }
+
+    const renderJsonValue = (value, path = '', depth = 0) => {
+        const indent = '  '.repeat(depth)
+        const currentPath = path
+
+        if (value === null) {
+            return <span className="json-null">null</span>
         }
-        if (typeof data === 'object') {
-            return JSON.stringify(data, null, 2)
+
+        if (value === undefined) {
+            return <span className="json-undefined">undefined</span>
         }
-        return String(data)
+
+        if (typeof value === 'boolean') {
+            return <span className="json-boolean">{String(value)}</span>
+        }
+
+        if (typeof value === 'number') {
+            return <span className="json-number">{value}</span>
+        }
+
+        if (typeof value === 'string') {
+            return <span className="json-string">"{value}"</span>
+        }
+
+        if (Array.isArray(value)) {
+            if (value.length === 0) {
+                return <span className="json-bracket">[]</span>
+            }
+
+            const collapsed = isCollapsed(currentPath)
+            return (
+                <div className="json-container">
+                    <span
+                        className="json-toggle"
+                        onClick={() => toggleCollapse(currentPath)}
+                        title={collapsed ? 'Expand' : 'Collapse'}
+                    >
+                        {collapsed ? '▶' : '▼'}
+                    </span>
+                    <span className="json-bracket">[</span>
+                    {!collapsed && (
+                        <div className="json-content">
+                            {value.map((item, index) => (
+                                <div key={index} className="json-item">
+                                    <span className="json-indent">{indent}  </span>
+                                    {renderJsonValue(item, `${currentPath}[${index}]`, depth + 1)}
+                                    {index < value.length - 1 && <span className="json-comma">,</span>}
+                                </div>
+                            ))}
+                            <span className="json-indent">{indent}</span>
+                        </div>
+                    )}
+                    {collapsed && <span className="json-ellipsis">... {value.length} item{value.length !== 1 ? 's' : ''}</span>}
+                    <span className="json-bracket">]</span>
+                </div>
+            )
+        }
+
+        if (typeof value === 'object') {
+            const keys = Object.keys(value)
+            if (keys.length === 0) {
+                return <span className="json-bracket">{'{}'}</span>
+            }
+
+            const collapsed = isCollapsed(currentPath)
+            return (
+                <div className="json-container">
+                    <span
+                        className="json-toggle"
+                        onClick={() => toggleCollapse(currentPath)}
+                        title={collapsed ? 'Expand' : 'Collapse'}
+                    >
+                        {collapsed ? '▶' : '▼'}
+                    </span>
+                    <span className="json-bracket">{'{'}</span>
+                    {!collapsed && (
+                        <div className="json-content">
+                            {keys.map((key, index) => (
+                                <div key={key} className="json-item">
+                                    <span className="json-indent">{indent}  </span>
+                                    <span className="json-key">"{key}"</span>
+                                    <span className="json-colon">: </span>
+                                    {renderJsonValue(value[key], `${currentPath}.${key}`, depth + 1)}
+                                    {index < keys.length - 1 && <span className="json-comma">,</span>}
+                                </div>
+                            ))}
+                            <span className="json-indent">{indent}</span>
+                        </div>
+                    )}
+                    {collapsed && <span className="json-ellipsis">... {keys.length} key{keys.length !== 1 ? 's' : ''}</span>}
+                    <span className="json-bracket">{'}'}</span>
+                </div>
+            )
+        }
+
+        return <span>{String(value)}</span>
+    }
+
+    const renderResponseData = (data) => {
+        let parsedData
+        try {
+            if (typeof data === 'string') {
+                parsedData = JSON.parse(data)
+            } else {
+                parsedData = data
+            }
+        } catch {
+            // Not JSON, render as plain text
+            return <pre className="response-content response-text">{String(data)}</pre>
+        }
+
+        return (
+            <div className="response-content response-json">
+                {renderJsonValue(parsedData)}
+            </div>
+        )
     }
 
     const handleUpload = async () => {
@@ -208,6 +330,9 @@ function App() {
         setLoading(true)
         setError(null)
         setResponse(null)
+        setCollapsedPaths(new Set())
+        setHeadersExpanded(true)
+        setBodyExpanded(true)
 
         try {
             for (const file of selectedFiles) {
@@ -464,19 +589,43 @@ function App() {
                         <h2>Server Response</h2>
                         <div className="response-info">
                             <div className="response-status">
-                                <strong>Status:</strong> {response.status} {response.statusText}
+                                <strong>Status:</strong>{' '}
+                                <span className={`status-code status-${Math.floor(response.status / 100)}xx`}>
+                                    {response.status}
+                                </span>{' '}
+                                {response.statusText}
                             </div>
                             <div className="response-file">
                                 <strong>File:</strong> {response.file}
                             </div>
                         </div>
                         <div className="response-headers">
-                            <strong>Headers:</strong>
-                            <pre>{JSON.stringify(response.headers, null, 2)}</pre>
+                            <div
+                                className="response-section-header"
+                                onClick={() => setHeadersExpanded(!headersExpanded)}
+                            >
+                                <span className="section-toggle">{headersExpanded ? '▼' : '▶'}</span>
+                                <strong>Headers</strong>
+                            </div>
+                            {headersExpanded && (
+                                <div className="response-headers-content">
+                                    {renderResponseData(response.headers)}
+                                </div>
+                            )}
                         </div>
                         <div className="response-body">
-                            <strong>Response Body:</strong>
-                            <pre className="response-content">{formatResponse(response.data)}</pre>
+                            <div
+                                className="response-section-header"
+                                onClick={() => setBodyExpanded(!bodyExpanded)}
+                            >
+                                <span className="section-toggle">{bodyExpanded ? '▼' : '▶'}</span>
+                                <strong>Response Body</strong>
+                            </div>
+                            {bodyExpanded && (
+                                <div className="response-body-content">
+                                    {renderResponseData(response.data)}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
