@@ -1,19 +1,87 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 
+const STORAGE_KEYS = {
+    targetUrl: 'fileUpload_targetUrl',
+    authMethod: 'fileUpload_authMethod',
+    authValue: 'fileUpload_authValue',
+    username: 'fileUpload_username',
+    password: 'fileUpload_password',
+    customHeaders: 'fileUpload_customHeaders',
+    httpMethod: 'fileUpload_httpMethod',
+    contentTypeOverrides: 'fileUpload_contentTypeOverrides',
+    selectedFileNames: 'fileUpload_selectedFileNames'
+}
+
 function App() {
-    const [targetUrl, setTargetUrl] = useState('')
+    // Load initial values from localStorage
+    const loadFromStorage = (key, defaultValue) => {
+        try {
+            const item = localStorage.getItem(key)
+            if (item === null) return defaultValue
+            return JSON.parse(item)
+        } catch {
+            return defaultValue
+        }
+    }
+
+    const [targetUrl, setTargetUrl] = useState(() => loadFromStorage(STORAGE_KEYS.targetUrl, ''))
     const [selectedFiles, setSelectedFiles] = useState([])
-    const [authMethod, setAuthMethod] = useState('BEARER')
-    const [authValue, setAuthValue] = useState('')
-    const [username, setUsername] = useState('')
-    const [password, setPassword] = useState('')
-    const [customHeaders, setCustomHeaders] = useState([{ key: '', value: '' }])
-    const [httpMethod, setHttpMethod] = useState('POST')
-    const [contentTypeOverrides, setContentTypeOverrides] = useState({})
+    const [authMethod, setAuthMethod] = useState(() => loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER'))
+    const [authValue, setAuthValue] = useState(() => loadFromStorage(STORAGE_KEYS.authValue, ''))
+    const [username, setUsername] = useState(() => loadFromStorage(STORAGE_KEYS.username, ''))
+    const [password, setPassword] = useState(() => loadFromStorage(STORAGE_KEYS.password, ''))
+    const [customHeaders, setCustomHeaders] = useState(() => {
+        const loaded = loadFromStorage(STORAGE_KEYS.customHeaders, [{ key: '', value: '' }])
+        // Ensure at least one header row exists
+        return Array.isArray(loaded) && loaded.length > 0 ? loaded : [{ key: '', value: '' }]
+    })
+    const [httpMethod, setHttpMethod] = useState(() => loadFromStorage(STORAGE_KEYS.httpMethod, 'POST'))
+    const [contentTypeOverrides, setContentTypeOverrides] = useState(() => loadFromStorage(STORAGE_KEYS.contentTypeOverrides, {}))
     const [response, setResponse] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
+
+    // Save to localStorage whenever values change
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.targetUrl, JSON.stringify(targetUrl))
+    }, [targetUrl])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.authMethod, JSON.stringify(authMethod))
+    }, [authMethod])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.authValue, JSON.stringify(authValue))
+    }, [authValue])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.username, JSON.stringify(username))
+    }, [username])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.password, JSON.stringify(password))
+    }, [password])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.customHeaders, JSON.stringify(customHeaders))
+    }, [customHeaders])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.httpMethod, JSON.stringify(httpMethod))
+    }, [httpMethod])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.contentTypeOverrides, JSON.stringify(contentTypeOverrides))
+    }, [contentTypeOverrides])
+
+    // Save file names when files are selected (can't save File objects)
+    useEffect(() => {
+        if (selectedFiles.length > 0) {
+            const fileNames = selectedFiles.map(file => file.name)
+            localStorage.setItem(STORAGE_KEYS.selectedFileNames, JSON.stringify(fileNames))
+        }
+    }, [selectedFiles])
 
     // MIME type mapping based on file extensions
     const getMimeType = (filename) => {
@@ -80,6 +148,15 @@ function App() {
         })
         setContentTypeOverrides(newOverrides)
     }
+
+    // Load saved file names on mount (informational only - user needs to reselect)
+    useEffect(() => {
+        const savedFileNames = loadFromStorage(STORAGE_KEYS.selectedFileNames, [])
+        if (savedFileNames.length > 0) {
+            // Note: We can't restore the actual File objects, but we can show what was selected
+            // The user will need to reselect files, but we preserve the content-type overrides
+        }
+    }, [])
 
     const handleContentTypeChange = (filename, value) => {
         setContentTypeOverrides(prev => ({
