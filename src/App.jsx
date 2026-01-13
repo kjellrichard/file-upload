@@ -10,8 +10,34 @@ const STORAGE_KEYS = {
     customHeaders: 'fileUpload_customHeaders',
     httpMethod: 'fileUpload_httpMethod',
     contentTypeOverrides: 'fileUpload_contentTypeOverrides',
-    selectedFileNames: 'fileUpload_selectedFileNames'
+    selectedFileNames: 'fileUpload_selectedFileNames',
+    presets: 'fileUpload_presets',
+    headerVariables: 'fileUpload_headerVariables'
 }
+
+const DEFAULT_PRESETS = [
+    {
+        id: 'client-import-validation',
+        name: 'Client Import Validation',
+        targetUrl: 'https://companyservices.api.24sevenoffice.com/clientimport/validation',
+        authMethod: 'BEARER',
+        httpMethod: 'POST',
+        headers: [
+            { key: 'X-Tfso-License', value: ';{{clientId}};' }
+        ]
+    },
+    {
+        id: 'client-import',
+        name: 'Client Import',
+        httpMethod: 'POST',
+        targetUrl: 'https://companyservices.api.24sevenoffice.com/clientimport/jobs',
+        authMethod: 'BEARER',
+        headers: [
+            { key: 'X-Tfso-License', value: ';{{clientId}};' }
+        ]
+    }
+
+]
 
 function App() {
     // Load initial values from localStorage
@@ -25,42 +51,9 @@ function App() {
         }
     }
 
-    // Get initial targetUrl from query string or localStorage
-    const getInitialTargetUrl = () => {
-        if (typeof window !== 'undefined') {
-            const urlParams = new URLSearchParams(window.location.search)
-            const urlFromQuery = urlParams.get('url') || urlParams.get('targetUrl')
-            if (urlFromQuery) {
-                try {
-                    // Decode the URL in case it's encoded
-                    return decodeURIComponent(urlFromQuery)
-                } catch {
-                    return urlFromQuery
-                }
-            }
-        }
-        return loadFromStorage(STORAGE_KEYS.targetUrl, '')
-    }
-
-    // Get initial authMethod from query string or localStorage
-    const getInitialAuthMethod = () => {
-        if (typeof window !== 'undefined') {
-            const urlParams = new URLSearchParams(window.location.search)
-            const authMethodFromQuery = urlParams.get('authMethod') || urlParams.get('auth')
-            if (authMethodFromQuery) {
-                const upperAuthMethod = authMethodFromQuery.toUpperCase()
-                // Validate it's one of the allowed values
-                if (['BEARER', 'BASIC', 'BASIC_CREDENTIALS'].includes(upperAuthMethod)) {
-                    return upperAuthMethod
-                }
-            }
-        }
-        return loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER')
-    }
-
-    const [targetUrl, setTargetUrl] = useState(() => getInitialTargetUrl())
+    const [targetUrl, setTargetUrl] = useState(() => loadFromStorage(STORAGE_KEYS.targetUrl, ''))
     const [selectedFiles, setSelectedFiles] = useState([])
-    const [authMethod, setAuthMethod] = useState(() => getInitialAuthMethod())
+    const [authMethod, setAuthMethod] = useState(() => loadFromStorage(STORAGE_KEYS.authMethod, 'BEARER'))
     const [authValue, setAuthValue] = useState(() => loadFromStorage(STORAGE_KEYS.authValue, ''))
     const [username, setUsername] = useState(() => loadFromStorage(STORAGE_KEYS.username, ''))
     const [password, setPassword] = useState(() => loadFromStorage(STORAGE_KEYS.password, ''))
@@ -78,7 +71,41 @@ function App() {
     const [bodyExpanded, setBodyExpanded] = useState(true)
     const [showSampleTester, setShowSampleTester] = useState(false)
     const [sampleJsonInput, setSampleJsonInput] = useState('')
+    const [presets, setPresets] = useState(() => {
+
+        return DEFAULT_PRESETS
+    })
+    const [selectedPresetId, setSelectedPresetId] = useState('')
+    const [headerVariables, setHeaderVariables] = useState(() => loadFromStorage(STORAGE_KEYS.headerVariables, {}))
     const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '')
+
+    // Read query string parameters on mount
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search)
+
+            // Check for target URL in query string
+            const urlFromQuery = urlParams.get('url') || urlParams.get('targetUrl')
+            if (urlFromQuery) {
+                try {
+                    const decodedUrl = decodeURIComponent(urlFromQuery)
+                    setTargetUrl(decodedUrl)
+                } catch {
+                    setTargetUrl(urlFromQuery)
+                }
+            }
+
+            // Check for auth method in query string
+            const authMethodFromQuery = urlParams.get('authMethod') || urlParams.get('auth')
+            if (authMethodFromQuery) {
+                const upperAuthMethod = authMethodFromQuery.toUpperCase()
+                // Validate it's one of the allowed values
+                if (['BEARER', 'BASIC', 'BASIC_CREDENTIALS'].includes(upperAuthMethod)) {
+                    setAuthMethod(upperAuthMethod)
+                }
+            }
+        }
+    }, [])
 
     // Save to localStorage whenever values change
     useEffect(() => {
@@ -112,6 +139,43 @@ function App() {
     useEffect(() => {
         localStorage.setItem(STORAGE_KEYS.contentTypeOverrides, JSON.stringify(contentTypeOverrides))
     }, [contentTypeOverrides])
+
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.presets, JSON.stringify(presets))
+    }, [presets])
+
+    // Save headerVariables to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEYS.headerVariables, JSON.stringify(headerVariables))
+    }, [headerVariables])
+
+    // Extract variables from header values and update headerVariables state
+    useEffect(() => {
+        const variables = new Set()
+        customHeaders.forEach(header => {
+            if (header.value) {
+                // Match {{variableName}} pattern
+                const matches = header.value.match(/\{\{(\w+)\}\}/g)
+                if (matches) {
+                    matches.forEach(match => {
+                        // Extract variable name (remove {{ and }})
+                        const varName = match.slice(2, -2)
+                        variables.add(varName)
+                    })
+                }
+            }
+        })
+
+        // Update headerVariables: keep existing values, remove variables that no longer exist
+        setHeaderVariables(prev => {
+            const updated = {}
+            variables.forEach(varName => {
+                // Preserve current value if it exists, otherwise keep empty string
+                updated[varName] = prev[varName] !== undefined ? prev[varName] : ''
+            })
+            return updated
+        })
+    }, [customHeaders])
 
     // Save file names when files are selected (can't save File objects)
     useEffect(() => {
@@ -205,16 +269,50 @@ function App() {
 
     const addCustomHeader = () => {
         setCustomHeaders([...customHeaders, { key: '', value: '' }])
+        setSelectedPresetId('') // Clear preset selection when manually adding headers
     }
 
     const removeCustomHeader = (index) => {
         setCustomHeaders(customHeaders.filter((_, i) => i !== index))
+        setSelectedPresetId('') // Clear preset selection when manually removing headers
     }
 
     const updateCustomHeader = (index, field, value) => {
         const updated = [...customHeaders]
         updated[index][field] = value
         setCustomHeaders(updated)
+        setSelectedPresetId('') // Clear preset selection when manually editing headers
+    }
+
+    const loadPreset = (presetId) => {
+        const preset = presets.find(p => p.id === presetId)
+        if (preset) {
+            setTargetUrl(preset.targetUrl || '')
+            setAuthMethod(preset.authMethod || 'BEARER')
+            // Load HTTP method from preset if provided
+            if (preset.httpMethod) {
+                setHttpMethod(preset.httpMethod)
+            }
+            // Load headers from preset if provided, otherwise keep existing headers
+            if (preset.headers && Array.isArray(preset.headers) && preset.headers.length > 0) {
+                // Ensure at least one header row exists
+                const presetHeaders = preset.headers.map(h => ({
+                    key: h.key || '',
+                    value: h.value || ''
+                }))
+                setCustomHeaders(presetHeaders.length > 0 ? presetHeaders : [{ key: '', value: '' }])
+            }
+            setSelectedPresetId(presetId)
+        }
+    }
+
+    const handlePresetChange = (e) => {
+        const presetId = e.target.value
+        if (presetId) {
+            loadPreset(presetId)
+        } else {
+            setSelectedPresetId('')
+        }
     }
 
     const colorizeJson = (jsonString) => {
@@ -325,6 +423,19 @@ function App() {
         )
     }
 
+    // Replace variables in a string with their values
+    const replaceVariables = (str, variables) => {
+        let result = str
+        Object.keys(variables).forEach(varName => {
+            const value = variables[varName]
+            if (value === undefined || value === null || value === '') {
+                throw new Error(`Variable {{${varName}}} is missing a value`)
+            }
+            result = result.replace(new RegExp(`\\{\\{${varName}\\}\\}`, 'g'), value)
+        })
+        return result
+    }
+
     const handleUpload = async () => {
         if (!targetUrl) {
             setError('Please specify a target URL')
@@ -333,6 +444,29 @@ function App() {
 
         if (selectedFiles.length === 0) {
             setError('Please select at least one file')
+            return
+        }
+
+        // Validate that all variables have values
+        const missingVariables = []
+        customHeaders.forEach(header => {
+            if (header.value) {
+                const matches = header.value.match(/\{\{(\w+)\}\}/g)
+                if (matches) {
+                    matches.forEach(match => {
+                        const varName = match.slice(2, -2)
+                        if (!headerVariables[varName] || headerVariables[varName].trim() === '') {
+                            if (!missingVariables.includes(varName)) {
+                                missingVariables.push(varName)
+                            }
+                        }
+                    })
+                }
+            }
+        })
+
+        if (missingVariables.length > 0) {
+            setError(`Missing values for variables: ${missingVariables.map(v => `{{${v}}}`).join(', ')}`)
             return
         }
 
@@ -356,10 +490,15 @@ function App() {
                     headers['Authorization'] = `Basic ${credentials}`
                 }
 
-                // Add custom headers
+                // Add custom headers with variable replacement
                 customHeaders.forEach(header => {
                     if (header.key && header.value) {
-                        headers[header.key] = header.value
+                        try {
+                            const headerValue = replaceVariables(header.value, headerVariables)
+                            headers[header.key] = headerValue
+                        } catch (err) {
+                            throw err
+                        }
                     }
                 })
 
@@ -373,7 +512,10 @@ function App() {
                 const options = {
                     method: httpMethod,
                     headers: headers,
-                    body: httpMethod === 'GET' ? null : fileBlob
+                    body: httpMethod === 'GET' ? null : fileBlob,
+                    credentials: 'include'
+
+
                 }
 
                 const fetchResponse = await fetch(targetUrl, options)
@@ -409,11 +551,32 @@ function App() {
 
                 <div className="form-section">
                     <label>
+                        Load Preset
+                        <select
+                            value={selectedPresetId}
+                            onChange={handlePresetChange}
+                            className="input-field"
+                        >
+                            <option value="">-- Select a preset --</option>
+                            {presets.map(preset => (
+                                <option key={preset.id} value={preset.id}>
+                                    {preset.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                <div className="form-section">
+                    <label>
                         Target URL <span className="required">*</span>
                         <input
                             type="url"
                             value={targetUrl}
-                            onChange={(e) => setTargetUrl(e.target.value)}
+                            onChange={(e) => {
+                                setTargetUrl(e.target.value)
+                                setSelectedPresetId('') // Clear preset selection when manually editing
+                            }}
                             placeholder="https://example.com/upload"
                             className="input-field"
                         />
@@ -425,7 +588,10 @@ function App() {
                         HTTP Method
                         <select
                             value={httpMethod}
-                            onChange={(e) => setHttpMethod(e.target.value)}
+                            onChange={(e) => {
+                                setHttpMethod(e.target.value)
+                                setSelectedPresetId('') // Clear preset selection when manually editing
+                            }}
                             className="input-field"
                         >
                             <option value="POST">POST</option>
@@ -484,7 +650,10 @@ function App() {
                         Authentication Method
                         <select
                             value={authMethod}
-                            onChange={(e) => setAuthMethod(e.target.value)}
+                            onChange={(e) => {
+                                setAuthMethod(e.target.value)
+                                setSelectedPresetId('') // Clear preset selection when manually editing
+                            }}
                             className="input-field"
                         >
                             <option value="BEARER">Bearer Token</option>
@@ -533,6 +702,31 @@ function App() {
                                 className="input-field"
                             />
                         </label>
+                    </div>
+                )}
+
+                {Object.keys(headerVariables).length > 0 && (
+                    <div className="form-section">
+                        <label>Header Variables</label>
+                        {Object.keys(headerVariables).sort().map(varName => (
+                            <div key={varName} style={{ marginBottom: '10px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600', color: '#4a5568', fontSize: '14px' }}>
+                                    {`{{${varName}}}`}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={headerVariables[varName]}
+                                    onChange={(e) => {
+                                        setHeaderVariables(prev => ({
+                                            ...prev,
+                                            [varName]: e.target.value
+                                        }))
+                                    }}
+                                    placeholder={`Enter value for ${varName}`}
+                                    className="input-field"
+                                />
+                            </div>
+                        ))}
                     </div>
                 )}
 
@@ -788,7 +982,7 @@ function App() {
                                 onClick={() => setHeadersExpanded(!headersExpanded)}
                             >
                                 <span className="section-toggle">{headersExpanded ? '▼' : '▶'}</span>
-                                <strong>Headers</strong>
+                                <strong>Response Headers</strong>
                             </div>
                             {headersExpanded && (
                                 <div className="response-headers-content">
